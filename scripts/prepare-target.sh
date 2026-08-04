@@ -106,6 +106,34 @@ if [[ -e "$TARGET_DDL" && "$FORCE" != true ]]; then
   fail "O DDL destino já existe: ${TARGET_DDL}. Use --force para substituí-lo."
 fi
 
+DDL_ALREADY_ADJUSTED=false
+if grep -Eq '^[[:space:]]*\)[[:space:]]+SEGMENT CREATION IMMEDIATE' "$SOURCE_DDL"; then
+  DDL_ALREADY_ADJUSTED=true
+
+  DATA_TABLESPACE_COUNT="$(
+    grep -Ec "^[[:space:]]*TABLESPACE[[:space:]]+${TARGET_DATA_TABLESPACE};[[:space:]]*$" \
+      "$SOURCE_DDL" || true
+  )"
+  INDEX_TABLESPACE_COUNT="$(
+    grep -Ec "^[[:space:]]*TABLESPACE[[:space:]]+${TARGET_INDEX_TABLESPACE};[[:space:]]*$" \
+      "$SOURCE_DDL" || true
+  )"
+  INDEX_COMPRESSION_COUNT="$(
+    grep -Ec '^[[:space:]]*COMPRESS 1 NOLOGGING[[:space:]]*$' "$SOURCE_DDL" || true
+  )"
+
+  [[ "$DATA_TABLESPACE_COUNT" == "1" ]] \
+    || fail "DDL ajustado não possui exatamente um TABLESPACE ${TARGET_DATA_TABLESPACE}."
+  [[ "$INDEX_TABLESPACE_COUNT" == "$INDEX_COUNT" ]] \
+    || fail "DDL ajustado não direciona todos os ${INDEX_COUNT} índices para ${TARGET_INDEX_TABLESPACE}."
+  [[ "$INDEX_COMPRESSION_COUNT" == "$INDEX_COUNT" ]] \
+    || fail "DDL ajustado não possui COMPRESS 1 NOLOGGING nos ${INDEX_COUNT} índices."
+  grep -Eq '^[[:space:]]*PCTFREE 0[[:space:]]*$' "$SOURCE_DDL" \
+    || fail 'DDL ajustado não possui PCTFREE 0 na tabela.'
+  grep -Eq '^[[:space:]]*COMPRESS BASIC NOLOGGING[[:space:]]*$' "$SOURCE_DDL" \
+    || fail 'DDL ajustado não possui COMPRESS BASIC NOLOGGING na tabela.'
+fi
+
 TMP_DIR="$(mktemp -d)"
 GENERATED_DDL="${TMP_DIR}/010_target_baseline.sql"
 
@@ -118,7 +146,10 @@ cleanup() {
 
 trap cleanup EXIT
 
-if ! awk '
+if [[ "$DDL_ALREADY_ADJUSTED" == true ]]; then
+  cp "$SOURCE_DDL" "$GENERATED_DDL"
+  log 'DDL já ajustado detectado; parâmetros físicos validados sem reaplicação.'
+elif ! awk '
   BEGIN {
     table_adjusted = 0
     indexes_adjusted = 0

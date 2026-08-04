@@ -8,6 +8,10 @@ O DDL institucional é transformado localmente em
 `db/schema/010_target_baseline.sql`. Esse arquivo, o `.env`, seus backups e os
 secrets são ignorados pelo Git.
 
+O preparador também aceita um DDL que já contenha os ajustes físicos. Nesse
+caso, ele valida owner, compressão e tablespaces e apenas posiciona uma cópia
+para o bootstrap, sem reaplicar as cláusulas.
+
 ## O que é preservado da origem
 
 O DDL derivado mantém os seguintes atributos relevantes para a carga:
