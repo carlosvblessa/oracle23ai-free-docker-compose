@@ -1,0 +1,26 @@
+# Ambientes locais
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+
+# Segredos locais
+secrets/*
+!secrets/README.md
+!secrets/.gitkeep
+
+# Backups e logs
+backups/*
+!backups/.gitkeep
+*.dmp
+*.log
+
+# Chaves, certificados e wallets
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+cwallet.sso
+ewallet.p12

@@ -1,0 +1,73 @@
+name: ${COMPOSE_PROJECT_NAME:-oracle23ai-replica}
+
+services:
+  oracle:
+    image: ${ORACLE_IMAGE:-container-registry.oracle.com/database/free:23.9.0.0}
+    platform: ${ORACLE_PLATFORM:-linux/amd64}
+    container_name: ${ORACLE_CONTAINER_NAME:-oracle23ai-replica-db}
+    hostname: ${ORACLE_HOSTNAME:-oracle23ai-replica}
+    restart: unless-stopped
+    stop_grace_period: 2m
+
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+
+    environment:
+      TZ: ${TZ:-America/Maceio}
+
+      # Limitação da imagem oficial: a senha administrativa é recebida por
+      # ORACLE_PWD, não por variável do tipo *_FILE. O Makefile lê o secret
+      # local e injeta esta variável somente ao executar o Docker Compose.
+      ORACLE_PWD: ${ORACLE_PWD:?Execute os comandos pelo Makefile ou exporte ORACLE_PWD}
+      ORACLE_CHARACTERSET: ${ORACLE_CHARACTERSET:-AL32UTF8}
+      ENABLE_ARCHIVELOG: ${ENABLE_ARCHIVELOG:-false}
+      ENABLE_FORCE_LOGGING: ${ENABLE_FORCE_LOGGING:-false}
+
+      # Variáveis próprias dos scripts de setup. Na edição Free oficial,
+      # os nomes internos são fixos: CDB FREE e PDB/service FREEPDB1.
+      ORACLE_CDB_NAME: FREE
+      ORACLE_PDB_NAME: FREEPDB1
+      DB_ADMIN_USER: ${DB_ADMIN_USER:-REPLICA_ADMIN}
+      DB_SCHEMA_USER: ${DB_SCHEMA_USER:-REPLICA_OWNER}
+      DB_RUNTIME_USER: ${DB_RUNTIME_USER:-REPLICA_APP}
+      DB_RUNTIME_ROLE: ${DB_RUNTIME_ROLE:-REPLICA_RUNTIME_ROLE}
+      DB_DATA_TABLESPACE: ${DB_DATA_TABLESPACE:-REPLICA_DATA}
+      DB_INDEX_TABLESPACE: ${DB_INDEX_TABLESPACE:-REPLICA_INDEX}
+
+    secrets:
+      - oracle_password
+      - db_admin_password
+      - db_schema_password
+      - db_runtime_password
+
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./db/setup:/opt/oracle/scripts/setup:ro
+      - ./db/schema:/project/schema:ro
+
+    shm_size: ${ORACLE_SHM_SIZE:-2g}
+    mem_limit: ${ORACLE_MEMORY_LIMIT:-4g}
+
+    networks:
+      - oracle_net
+
+secrets:
+  # A imagem oficial não lê este secret diretamente. Ele também é montado
+  # para comandos administrativos; o Makefile o converte em ORACLE_PWD.
+  oracle_password:
+    file: ./secrets/oracle_password.txt
+  db_admin_password:
+    file: ./secrets/db_admin_password.txt
+  db_schema_password:
+    file: ./secrets/db_schema_password.txt
+  db_runtime_password:
+    file: ./secrets/db_runtime_password.txt
+
+volumes:
+  oracle_data:
+    name: ${ORACLE_VOLUME_NAME:-oracle23ai-replica-data}
+
+networks:
+  oracle_net:
+    name: ${ORACLE_NETWORK_NAME:-oracle23ai-replica-net}
+    driver: bridge
