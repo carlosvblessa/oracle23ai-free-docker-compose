@@ -9,6 +9,8 @@ set -a
 source .env
 set +a
 
+./scripts/configure-container-access.sh
+
 export ORACLE_PWD="$(tr -d '\r\n' < secrets/oracle_password.txt)"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 DUMP_FILE="${DB_SCHEMA_USER}_${STAMP}.dmp"

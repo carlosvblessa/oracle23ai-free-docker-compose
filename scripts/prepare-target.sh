@@ -68,6 +68,9 @@ fi
 SOURCE_DDL="$1"
 [[ -r "$SOURCE_DDL" ]] || fail "DDL não encontrado ou ilegível: ${SOURCE_DDL}"
 
+command -v setfacl >/dev/null 2>&1 \
+  || fail 'setfacl não está instalado. Ubuntu/Debian: sudo apt install acl. RHEL/Oracle Linux/Fedora: sudo dnf install acl.'
+
 for var in \
   TARGET_SCHEMA_USER \
   TARGET_LOADER_USER \
@@ -211,9 +214,11 @@ set_env_value DB_INDEX_TABLESPACE "$TARGET_INDEX_TABLESPACE"
 
 "${ROOT_DIR}/scripts/generate-secrets.sh"
 mv "$GENERATED_DDL" "$TARGET_DDL"
+chmod 600 "$TARGET_DDL"
+"${ROOT_DIR}/scripts/configure-container-access.sh"
 
 log "DDL privado gerado em ${TARGET_DDL}."
 log "Owner: ${TARGET_SCHEMA_USER}"
 log "Loader: ${TARGET_LOADER_USER} via role ${TARGET_LOADER_ROLE}"
 log "Tablespaces: ${TARGET_DATA_TABLESPACE} / ${TARGET_INDEX_TABLESPACE}"
-log 'Preparação concluída. Próximos passos: make config && make pull && make up'
+log 'Preparação concluída. Próximos passos: make config && make pull && make up && make provision'

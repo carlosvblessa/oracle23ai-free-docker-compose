@@ -12,6 +12,28 @@ O preparador também aceita um DDL que já contenha os ajustes físicos. Nesse
 caso, ele valida owner, compressão e tablespaces e apenas posiciona uma cópia
 para o bootstrap, sem reaplicar as cláusulas.
 
+O projeto executa esse bootstrap explicitamente com `make provision`. Os
+scripts são montados em `/project/setup`, fora do gancho automático da imagem
+Oracle, para que falhas de permissão não sejam silenciosamente ignoradas.
+
+## Pré-requisitos da máquina
+
+Além de Docker Engine, Docker Compose e `openssl`, instale o suporte a ACL
+POSIX. No Ubuntu ou Debian:
+
+```bash
+sudo apt install acl
+```
+
+No RHEL, Oracle Linux ou Fedora:
+
+```bash
+sudo dnf install acl
+```
+
+O UID interno da conta `oracle` é `54321`. O preparador mantém secrets e DDL
+privado com modo `600` e concede leitura somente a esse UID via ACL.
+
 ## O que é preservado da origem
 
 O DDL derivado mantém os seguintes atributos relevantes para a carga:
@@ -46,7 +68,8 @@ TARGET_INDEX_TABLESPACE=SOURCE_INDEX_TABLESPACE \
 
 O preparador usa as variáveis `DB_RUNTIME_USER` e `DB_RUNTIME_ROLE` existentes
 no projeto para representar, respectivamente, o usuário e a role de carga. Ele
-cria as senhas locais com permissão `600`, sem imprimi-las.
+cria as senhas locais com permissão `600`, sem imprimi-las, e configura as ACLs
+necessárias para os arquivos montados no container.
 
 Se um DDL destino já tiver sido gerado e precisar ser substituído, revise o
 arquivo de origem e use explicitamente:
@@ -67,27 +90,42 @@ docker volume ls --filter name=oracle23ai-data
 make config
 ```
 
-O procedimento pressupõe um volume novo. Caso o volume já exista, pare e
-confirme seu conteúdo antes de continuar; os scripts de bootstrap da imagem
-Oracle são executados somente na primeira inicialização do banco.
+O procedimento pressupõe um volume novo. Caso o volume já exista, confirme seu
+conteúdo antes de continuar. `make provision` registra sua conclusão em um
+marcador dentro do volume e não reaplica o baseline quando esse marcador já
+existe.
 
 Para um destino novo:
 
 ```bash
-make login
 make pull
 make up
-make logs
+make provision
+make verify
 ```
 
-Na primeira inicialização, a ordem é:
+O pull dessa imagem é público e normalmente não exige autenticação. Se o
+registry responder explicitamente com erro de autenticação, execute
+`make login` usando a conta Oracle Single Sign-On, e não o usuário Linux.
+
+`make up` inicia somente o Oracle. `make provision` espera o healthcheck ficar
+saudável e então executa, com verificação de cada erro:
 
 1. criação dos tablespaces, owner, loader e role;
 2. execução de `010_target_baseline.sql` conectado como owner;
-3. concessão da role ao loader e dos privilégios de DML nos objetos criados.
+3. concessão da role ao loader e dos privilégios de DML nos objetos criados;
+4. validação e gravação do marcador de provisionamento no volume.
+
+Para acompanhar o Oracle em outro terminal:
+
+```bash
+make logs
+```
 
 O DDL de baseline possui `CREATE TABLE` e não deve ser reaplicado com
-`make apply-schema` sobre o mesmo volume sem antes torná-lo idempotente.
+`make apply-schema` sobre o mesmo volume sem antes torná-lo idempotente. O
+marcador protege `make provision`, mas `make apply-schema` é deliberadamente um
+comando manual e percorre novamente todos os arquivos `*.sql`.
 
 O baseline mantém os três índices antes da carga para reproduzir o DDL
 recebido. Se a carga inicial tiver grande volume, considere separar a criação
@@ -107,6 +145,7 @@ Depois que o container estiver `healthy`, conecte como administrador:
 
 ```bash
 make status
+make verify
 make sql-admin
 ```
 
@@ -149,3 +188,53 @@ O loader deve usar nomes qualificados, como
 `SCHEMA_OWNER.NOME_DA_TABELA`, ou configurar
 `ALTER SESSION SET CURRENT_SCHEMA = SCHEMA_OWNER`. Isso não amplia seus
 privilégios; apenas altera a resolução dos nomes.
+
+## Solução de problemas de permissão
+
+Se aparecer `Permission denied` ao ler `/run/secrets/*` ou `SP2-0310` para um
+arquivo de `/project/schema`, reaplique as ACLs:
+
+```bash
+make access
+```
+
+Confirme dentro do container:
+
+```bash
+ORACLE_PWD="$(tr -d '\r\n' < secrets/oracle_password.txt)" \
+docker compose exec -T oracle bash -lc '
+  test -r /run/secrets/db_admin_password
+  test -r /project/schema/010_target_baseline.sql
+  echo "Secrets e DDL acessíveis"
+'
+```
+
+Não é necessário destruir o volume para corrigir apenas permissões. Depois de
+uma falha de permissão ocorrida antes da abertura do DDL, execute
+`make provision`; a criação de usuários e tablespaces é idempotente, e o
+marcador só é gravado depois que DDL e grants terminam com sucesso. Se um DDL
+chegou a executar parcialmente, inspecione os objetos antes da nova tentativa,
+pois comandos DDL do Oracle fazem commit implícito.
+
+## Atualizar um clone criado com a versão anterior
+
+Depois de receber estas correções, preserve o volume existente e execute:
+
+```bash
+git pull
+make up
+make provision
+make verify
+```
+
+`make up` recriará somente o container para trocar o mount dos scripts de
+`/opt/oracle/scripts/setup` para `/project/setup`; o volume de dados não será
+removido. Não use `make destroy` nessa atualização.
+
+Se esse volume antigo já tiver objetos e `make provision` recusar a
+reaplicação por ausência do marcador, primeiro confira o resultado de
+`make verify`. Somente se o provisionamento legado estiver completo, execute:
+
+```bash
+make adopt-provisioned
+```

@@ -10,8 +10,8 @@ Coloque aqui os arquivos SQL do modelo de dados, em ordem numérica:
 050_seed_data.sql
 ```
 
-Eles são executados como o usuário definido por `DB_SCHEMA_USER` durante a
-primeira criação do volume. O SQL*Plus disponibiliza estas variáveis:
+Eles são executados como o usuário definido por `DB_SCHEMA_USER` quando
+`make provision` é chamado. O SQL*Plus disponibiliza estas variáveis:
 
 ```sql
 &&DATA_TABLESPACE
@@ -31,10 +31,21 @@ CREATE INDEX ix_exemplo_descricao
   TABLESPACE &&INDEX_TABLESPACE;
 ```
 
-Para aplicar os arquivos depois que o banco já foi criado:
+O provisionamento inicial, incluindo usuários, tablespaces, DDLs e grants, é:
+
+```bash
+make provision
+```
+
+Para aplicar arquivos depois que o volume já foi provisionado:
 
 ```bash
 make apply-schema
 ```
 
-Os scripts devem ser idempotentes caso sejam executados mais de uma vez.
+`make apply-schema` percorre novamente todos os arquivos `*.sql`. Os scripts
+devem ser idempotentes caso sejam executados mais de uma vez. Tanto erros SQL
+quanto erros `SP2-*` interrompem a execução e impedem a atualização dos grants.
+
+Arquivos privados podem permanecer com modo `600`. Execute `make access` para
+conceder ao UID `54321` do container somente a leitura via ACL POSIX.

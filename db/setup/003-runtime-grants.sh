@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 sqlplus -s / as sysdba <<SQL
+WHENEVER OSERROR EXIT FAILURE
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -62,5 +63,7 @@ SELECT GRANTEE, GRANTED_ROLE
   FROM DBA_ROLE_PRIVS
  WHERE GRANTEE = '${DB_RUNTIME_USER}';
 
-EXIT
+EXIT SUCCESS
 SQL
+
+printf '[grants] Grants de runtime atualizados com sucesso.\n'

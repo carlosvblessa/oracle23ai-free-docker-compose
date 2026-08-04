@@ -30,7 +30,12 @@ registrar a senha no YAML ou no `.env`, o Makefile lê o arquivo protegido
 `secrets/oracle_password.txt` e injeta a variável somente ao executar o
 Compose. Ainda assim, administradores do host Docker podem vê-la com
 `docker inspect`. As senhas dos usuários criados pelo projeto usam Docker
-Secrets normalmente.
+Secrets montados a partir de arquivos locais.
+
+O Docker Compose implementa esses secrets locais como bind mounts e não altera
+seu proprietário para o UID do container. O projeto mantém secrets e DDLs
+privados sem acesso para `other` e usa ACL POSIX para conceder leitura somente
+ao usuário `oracle` da imagem, UID `54321`.
 
 ## Estrutura
 
@@ -43,13 +48,17 @@ Secrets normalmente.
 │   ├── setup
 │   │   ├── 001-bootstrap.sh
 │   │   ├── 002-run-schema.sh
-│   │   └── 003-runtime-grants.sh
+│   │   ├── 003-runtime-grants.sh
+│   │   └── 004-verify.sh
 │   └── schema
 │       ├── README.md
 │       └── 010_example.sql.disabled
 ├── scripts
 │   ├── export-schema.sh
+│   ├── configure-container-access.sh
 │   ├── generate-secrets.sh
+│   ├── prepare-target.sh
+│   ├── provision.sh
 │   └── refresh-runtime-grants.sh
 ├── secrets
 └── backups
@@ -68,18 +77,36 @@ O usuário de aplicação recebe uma role própria. Depois da criação dos obje
 o projeto concede DML nas tabelas, leitura em views e sequences e execução em
 procedures, functions e packages.
 
-## Pré-requisitos no Oracle Container Registry
+## Pré-requisitos
 
-Antes do primeiro `pull`:
+- Docker Engine com o plugin Docker Compose;
+- `openssl` para gerar senhas;
+- `setfacl`, fornecido pelo pacote `acl`.
 
-1. Acesse o Oracle Container Registry com uma conta Oracle.
-2. Abra o repositório `database/free` e aceite os termos de uso, caso sejam
-   solicitados para sua conta.
-3. Autentique o Docker:
+Ubuntu ou Debian:
 
 ```bash
-make login
+sudo apt install acl
 ```
+
+RHEL, Oracle Linux ou Fedora:
+
+```bash
+sudo dnf install acl
+```
+
+### Oracle Container Registry
+
+A imagem `container-registry.oracle.com/database/free:23.9.0.0` pode ser
+baixada publicamente. Tente diretamente:
+
+```bash
+make pull
+```
+
+Não execute `make login` preventivamente. Se o registry responder
+explicitamente com erro de autenticação, use `make login` e informe a conta do
+Oracle Single Sign-On — não o usuário Linux da máquina — e repita o pull.
 
 ## Primeiro uso
 
@@ -105,20 +132,31 @@ DB_INDEX_TABLESPACE=APP_INDEX
 Depois:
 
 ```bash
-make login
 make config
 make pull
 make up
+make provision
+make verify
+```
+
+`make provision` aguarda o healthcheck ficar `healthy`. Para acompanhar apenas
+os logs, em outro terminal, use:
+
+```bash
 make logs
 ```
 
-O banco está pronto quando o container ficar `healthy` e o log mostrar:
+As mensagens `[provision]`, `[bootstrap]`, `[schema]` e `[grants]` aparecem no
+terminal que executa `make provision`; elas não fazem parte do log principal do
+container.
+
+O Oracle está disponível quando o log mostrar:
 
 ```text
 DATABASE IS READY TO USE!
 ```
 
-Verifique:
+Verificações operacionais adicionais:
 
 ```bash
 make status
@@ -167,17 +205,57 @@ Coloque os arquivos em `db/schema`, por exemplo:
 050_seed_data.sql
 ```
 
-Na primeira inicialização de um volume vazio, a imagem oficial executa os
-scripts montados em `/opt/oracle/scripts/setup`. Os arquivos do modelo são
-executados como `DB_SCHEMA_USER`.
+O projeto não depende do gancho automático `/opt/oracle/scripts/setup` da
+imagem. Os scripts são montados no diretório neutro `/project/setup` e
+executados explicitamente por:
 
-Para um banco já criado:
+```bash
+make provision
+```
+
+O provisionamento segue esta ordem:
+
+1. espera o healthcheck do Oracle;
+2. valida a leitura dos secrets, scripts e DDLs dentro do container;
+3. cria ou atualiza tablespaces, usuários e role;
+4. executa `db/schema/*.sql`, em ordem lexical, como `DB_SCHEMA_USER`;
+5. concede os privilégios dos objetos para `DB_RUNTIME_ROLE`;
+6. valida usuários, tablespaces, objetos e role;
+7. grava um marcador no volume persistente.
+
+Se o marcador já existir, `make provision` não reaplica o baseline. Isso evita
+falhas de `CREATE TABLE` em um volume já preparado.
+
+Se um volume sem marcador já possuir objetos do owner, o provisionamento para
+antes do DDL. Após confirmar que se trata de um ambiente legado completo, use
+`make verify` e `make adopt-provisioned`; a adoção só cria o marcador quando a
+validação é bem-sucedida.
+
+Para aplicar posteriormente arquivos novos e idempotentes:
 
 ```bash
 make apply-schema
 ```
 
-Nesse caso, os arquivos devem ser idempotentes ou tratar objetos existentes.
+Esse comando percorre novamente todos os arquivos `*.sql`; portanto, eles devem
+ser idempotentes ou tratar objetos existentes. Erros SQL e erros do SQL*Plus,
+como `SP2-0310`, interrompem o comando antes da atualização de grants.
+
+## Permissões dos arquivos montados
+
+`make init`, `scripts/prepare-target.sh`, `make provision`, `make sql-admin`,
+`make sql-owner`, `make sql-app`, `make apply-schema` e `make backup` aplicam ou
+reaplicam automaticamente as ACLs necessárias.
+
+Para reaplicá-las manualmente depois de substituir um secret ou DDL:
+
+```bash
+make access
+```
+
+O DDL privado pode continuar com modo `600`; a entrada ACL permite leitura
+somente ao UID `54321` do container. Não use `chmod 644` em secrets para
+contornar problemas de acesso.
 
 ## Preparação isolada de um destino
 
@@ -214,6 +292,7 @@ Remover também o volume e reinicializar tudo:
 ```bash
 make destroy
 make up
+make provision
 ```
 
 `make destroy` apaga definitivamente o banco do laboratório.

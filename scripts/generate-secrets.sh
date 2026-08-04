@@ -13,7 +13,10 @@ generate_password() {
 
 create_secret() {
   local file="$1"
-  if [[ -e "$file" ]]; then
+  if [[ -e "$file" || -L "$file" ]]; then
+    [[ -f "$file" && ! -L "$file" ]] \
+      || { printf 'ERRO: secret não é um arquivo regular: %s\n' "$file" >&2; exit 1; }
+    chmod 600 "$file"
     printf 'Mantido: %s\n' "$file"
     return
   fi
@@ -27,4 +30,4 @@ create_secret "${SECRETS_DIR}/db_admin_password.txt"
 create_secret "${SECRETS_DIR}/db_schema_password.txt"
 create_secret "${SECRETS_DIR}/db_runtime_password.txt"
 
-printf '\nSecrets criados com permissão 600. Não os adicione ao Git.\n'
+printf '\nSecrets mantidos com permissão 600. Não os adicione ao Git.\n'
