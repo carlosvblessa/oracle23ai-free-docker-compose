@@ -239,7 +239,9 @@ make apply-schema
 
 Esse comando percorre novamente todos os arquivos `*.sql`; portanto, eles devem
 ser idempotentes ou tratar objetos existentes. Erros SQL e erros do SQL*Plus,
-como `SP2-0310`, interrompem o comando antes da atualização de grants.
+como `SP2-0310` e `SP2-0734`, interrompem o comando antes da atualização de
+grants. O executor habilita `SQLBLANKLINES ON`, permitindo linhas em branco
+dentro de instruções SQL recebidas de ferramentas como DBeaver.
 
 ## Permissões dos arquivos montados
 

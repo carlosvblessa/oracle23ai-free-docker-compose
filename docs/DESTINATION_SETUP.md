@@ -216,6 +216,10 @@ marcador só é gravado depois que DDL e grants terminam com sucesso. Se um DDL
 chegou a executar parcialmente, inspecione os objetos antes da nova tentativa,
 pois comandos DDL do Oracle fazem commit implícito.
 
+O executor habilita `SQLBLANKLINES ON` para aceitar DDLs com linhas em branco
+dentro das instruções e também inspeciona a saída, tratando qualquer `SP2-*`
+como falha mesmo quando o processo SQL*Plus retorna código zero.
+
 ## Atualizar um clone criado com a versão anterior
 
 Depois de receber estas correções, preserve o volume existente e execute:

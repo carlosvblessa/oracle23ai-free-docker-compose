@@ -46,6 +46,8 @@ make apply-schema
 `make apply-schema` percorre novamente todos os arquivos `*.sql`. Os scripts
 devem ser idempotentes caso sejam executados mais de uma vez. Tanto erros SQL
 quanto erros `SP2-*` interrompem a execução e impedem a atualização dos grants.
+O executor usa `SET SQLBLANKLINES ON`, de modo que linhas em branco dentro de
+uma instrução SQL não encerram o buffer prematuramente.
 
 Arquivos privados podem permanecer com modo `600`. Execute `make access` para
 conceder ao UID `54321` do container somente a leitura via ACL POSIX.
