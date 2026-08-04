@@ -1,11 +1,11 @@
-name: ${COMPOSE_PROJECT_NAME:-oracle23ai-replica}
+name: ${COMPOSE_PROJECT_NAME:-oracle23ai}
 
 services:
   oracle:
     image: ${ORACLE_IMAGE:-container-registry.oracle.com/database/free:23.9.0.0}
     platform: ${ORACLE_PLATFORM:-linux/amd64}
-    container_name: ${ORACLE_CONTAINER_NAME:-oracle23ai-replica-db}
-    hostname: ${ORACLE_HOSTNAME:-oracle23ai-replica}
+    container_name: ${ORACLE_CONTAINER_NAME:-oracle23ai-db}
+    hostname: ${ORACLE_HOSTNAME:-oracle23ai-db}
     restart: unless-stopped
     stop_grace_period: 2m
 
@@ -27,12 +27,12 @@ services:
       # os nomes internos são fixos: CDB FREE e PDB/service FREEPDB1.
       ORACLE_CDB_NAME: FREE
       ORACLE_PDB_NAME: FREEPDB1
-      DB_ADMIN_USER: ${DB_ADMIN_USER:-REPLICA_ADMIN}
-      DB_SCHEMA_USER: ${DB_SCHEMA_USER:-REPLICA_OWNER}
-      DB_RUNTIME_USER: ${DB_RUNTIME_USER:-REPLICA_APP}
-      DB_RUNTIME_ROLE: ${DB_RUNTIME_ROLE:-REPLICA_RUNTIME_ROLE}
-      DB_DATA_TABLESPACE: ${DB_DATA_TABLESPACE:-REPLICA_DATA}
-      DB_INDEX_TABLESPACE: ${DB_INDEX_TABLESPACE:-REPLICA_INDEX}
+      DB_ADMIN_USER: ${DB_ADMIN_USER:-APP_ADMIN}
+      DB_SCHEMA_USER: ${DB_SCHEMA_USER:-APP_OWNER}
+      DB_RUNTIME_USER: ${DB_RUNTIME_USER:-APP_RUNTIME}
+      DB_RUNTIME_ROLE: ${DB_RUNTIME_ROLE:-APP_RUNTIME_ROLE}
+      DB_DATA_TABLESPACE: ${DB_DATA_TABLESPACE:-APP_DATA}
+      DB_INDEX_TABLESPACE: ${DB_INDEX_TABLESPACE:-APP_INDEX}
 
     secrets:
       - oracle_password
@@ -65,9 +65,9 @@ secrets:
 
 volumes:
   oracle_data:
-    name: ${ORACLE_VOLUME_NAME:-oracle23ai-replica-data}
+    name: ${ORACLE_VOLUME_NAME:-oracle23ai-data}
 
 networks:
   oracle_net:
-    name: ${ORACLE_NETWORK_NAME:-oracle23ai-replica-net}
+    name: ${ORACLE_NETWORK_NAME:-oracle23ai-net}
     driver: bridge

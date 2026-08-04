@@ -60,9 +60,9 @@ Secrets normalmente.
 | Conta | Finalidade |
 |---|---|
 | `SYS` / `SYSTEM` | Bootstrap e administração excepcional |
-| `REPLICA_ADMIN` | Administrador local do `FREEPDB1`, com role `DBA` |
-| `REPLICA_OWNER` | Proprietário de tabelas, índices, views e packages |
-| `REPLICA_APP` | Conexão da aplicação, sem privilégios de DDL |
+| `APP_ADMIN` | Administrador local do `FREEPDB1`, com role `DBA` |
+| `APP_OWNER` | Proprietário de tabelas, índices, views e packages |
+| `APP_RUNTIME` | Conexão da aplicação, sem privilégios de DDL |
 
 O usuário de aplicação recebe uma role própria. Depois da criação dos objetos,
 o projeto concede DML nas tabelas, leitura em views e sequences e execução em
@@ -84,8 +84,8 @@ make login
 ## Primeiro uso
 
 ```bash
-unzip oracle23ai-compose-oficial.zip
-cd oracle23ai-compose
+git clone https://github.com/carlosvblessa/oracle23ai-free-docker-compose.git
+cd oracle23ai-free-docker-compose
 make init
 ```
 
@@ -94,11 +94,12 @@ Revise `.env`. Os principais valores são:
 ```dotenv
 ORACLE_IMAGE=container-registry.oracle.com/database/free:23.9.0.0
 ORACLE_PLATFORM=linux/amd64
-DB_ADMIN_USER=REPLICA_ADMIN
-DB_SCHEMA_USER=REPLICA_OWNER
-DB_RUNTIME_USER=REPLICA_APP
-DB_DATA_TABLESPACE=REPLICA_DATA
-DB_INDEX_TABLESPACE=REPLICA_INDEX
+DB_ADMIN_USER=APP_ADMIN
+DB_SCHEMA_USER=APP_OWNER
+DB_RUNTIME_USER=APP_RUNTIME
+DB_RUNTIME_ROLE=APP_RUNTIME_ROLE
+DB_DATA_TABLESPACE=APP_DATA
+DB_INDEX_TABLESPACE=APP_INDEX
 ```
 
 Depois:
@@ -133,8 +134,8 @@ make version
 | Porta padrão | `1521` |
 | Service name | `FREEPDB1` |
 | CDB / SID | `FREE` |
-| Schema owner | `REPLICA_OWNER` |
-| Usuário da aplicação | `REPLICA_APP` |
+| Schema owner | `APP_OWNER` |
+| Usuário da aplicação | `APP_RUNTIME` |
 
 JDBC:
 
