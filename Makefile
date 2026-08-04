@@ -7,7 +7,7 @@ COMPOSE = ORACLE_PWD="$$(tr -d '\r\n' < secrets/oracle_password.txt)" docker com
 
 .PHONY: help init secrets access login config pull up logs ps status version provision \
         adopt-provisioned verify stop down destroy sql-sys sql-system sql-admin sql-owner \
-        sql-app apply-schema refresh-grants backup
+        sql-app apply-schema refresh-grants repair-baixaporof-comments backup
 
 help:
 	@printf '%s\n' \
@@ -30,6 +30,7 @@ help:
 	  'make sql-app         Abre como usuário da aplicação' \
 	  'make apply-schema    Executa os arquivos db/schema/*.sql' \
 	  'make refresh-grants  Reaplica grants nos objetos do esquema' \
+	  'make repair-baixaporof-comments  Reaplica somente os comentários do DDL local' \
 	  'make backup          Exporta o esquema com Data Pump' \
 	  'make down            Remove o container, preservando os dados' \
 	  'make destroy         Remove container E volume de dados'
@@ -118,6 +119,9 @@ apply-schema: access
 
 refresh-grants: access
 	@$(COMPOSE) exec -T oracle bash /project/setup/003-runtime-grants.sh
+
+repair-baixaporof-comments:
+	@./scripts/repair-baixaporof-comments.sh
 
 backup:
 	@./scripts/export-schema.sh

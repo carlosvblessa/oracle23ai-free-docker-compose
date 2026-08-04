@@ -15,6 +15,15 @@ services:
     environment:
       TZ: ${TZ:-America/Maceio}
 
+      # Charset do cliente Oracle. ORACLE_CHARACTERSET atua somente na criação
+      # do banco; o SQL*Plus usa NLS_LANG ao interpretar scripts no cliente.
+      NLS_LANG: ${NLS_LANG:-.AL32UTF8}
+
+      # C.utf8 foi confirmado na imagem oficial fixada acima. Além do NLS_LANG,
+      # mantém as ferramentas de shell do container em um locale UTF-8.
+      LANG: C.utf8
+      LC_ALL: C.utf8
+
       # Limitação da imagem oficial: a senha administrativa é recebida por
       # ORACLE_PWD, não por variável do tipo *_FILE. O Makefile lê o secret
       # local e injeta esta variável somente ao executar o Docker Compose.

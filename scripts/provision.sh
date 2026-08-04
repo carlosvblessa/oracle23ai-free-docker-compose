@@ -13,6 +13,12 @@ fail() {
   exit 1
 }
 
+# Não depende do ambiente de um container criado por uma versão anterior do
+# Compose: cada exec do provisionamento recebe explicitamente o charset Oracle.
+compose_exec() {
+  docker compose exec -T -e NLS_LANG=.AL32UTF8 "$@"
+}
+
 MODE=provision
 if (( $# > 1 )); then
   fail 'Uso: scripts/provision.sh [--adopt]'
@@ -73,7 +79,7 @@ done
 
 log 'Container saudável.'
 
-docker compose exec -T oracle bash -lc '
+compose_exec oracle bash -lc '
   set -Eeuo pipefail
   required=(
     /run/secrets/db_admin_password
@@ -106,25 +112,25 @@ docker compose exec -T oracle bash -lc '
 '
 
 PROVISION_MARKER=/opt/oracle/oradata/.oracle23ai-project-provisioned
-if docker compose exec -T oracle test -f "$PROVISION_MARKER"; then
+if compose_exec oracle test -f "$PROVISION_MARKER"; then
   log 'Provisionamento já concluído neste volume; nenhuma alteração reaplicada.'
-  docker compose exec -T oracle bash /project/setup/004-verify.sh
+  compose_exec oracle bash /project/setup/004-verify.sh
   log 'Para novos DDLs idempotentes, use make apply-schema.'
   exit 0
 fi
 
 if [[ "$MODE" == "adopt" ]]; then
   log 'Validando provisionamento legado antes de criar o marcador.'
-  docker compose exec -T oracle bash /project/setup/004-verify.sh
-  docker compose exec -T oracle touch "$PROVISION_MARKER"
+  compose_exec oracle bash /project/setup/004-verify.sh
+  compose_exec oracle touch "$PROVISION_MARKER"
   log 'Volume legado validado e adotado pelo fluxo explícito.'
   exit 0
 fi
 
-docker compose exec -T oracle bash /project/setup/001-bootstrap.sh
+compose_exec oracle bash /project/setup/001-bootstrap.sh
 
 existing_object_count="$({
-  docker compose exec -T oracle \
+  compose_exec oracle \
     bash /project/setup/004-verify.sh --object-count
 } | tr -d '[:space:]')"
 
@@ -135,9 +141,9 @@ if (( existing_object_count > 0 )); then
   fail "O owner já possui ${existing_object_count} objeto(s), mas o volume não tem marcador. O DDL não foi reaplicado. Valide com make verify e, se este for um volume legado completo, execute make adopt-provisioned."
 fi
 
-docker compose exec -T oracle bash /project/setup/002-run-schema.sh
-docker compose exec -T oracle bash /project/setup/003-runtime-grants.sh
-docker compose exec -T oracle bash /project/setup/004-verify.sh
-docker compose exec -T oracle touch "$PROVISION_MARKER"
+compose_exec oracle bash /project/setup/002-run-schema.sh
+compose_exec oracle bash /project/setup/003-runtime-grants.sh
+compose_exec oracle bash /project/setup/004-verify.sh
+compose_exec oracle touch "$PROVISION_MARKER"
 
 log 'Provisionamento concluído e volume marcado.'
