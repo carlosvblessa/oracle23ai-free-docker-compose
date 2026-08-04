@@ -179,6 +179,13 @@ make apply-schema
 
 Nesse caso, os arquivos devem ser idempotentes ou tratar objetos existentes.
 
+## Preparação isolada de um destino
+
+Para reproduzir um esquema a partir de um DDL que não deve ser versionado,
+use o preparador local descrito em
+[`docs/DESTINATION_SETUP.md`](docs/DESTINATION_SETUP.md). O procedimento gera
+o `.env`, os secrets e um DDL adaptado somente no clone da máquina destino.
+
 ## Persistência dos datafiles
 
 O volume nomeado é montado em:

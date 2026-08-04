@@ -24,3 +24,7 @@ backups/*
 *.jks
 cwallet.sso
 ewallet.p12
+
+# Artefatos gerados somente na máquina destino
+db/schema/010_target_baseline.sql
+local/
