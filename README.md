@@ -59,7 +59,6 @@ ao usuário `oracle` da imagem, UID `54321`.
 │   ├── generate-secrets.sh
 │   ├── prepare-target.sh
 │   ├── provision.sh
-│   ├── repair-baixaporof-comments.sh
 │   └── refresh-runtime-grants.sh
 ├── secrets
 └── backups
@@ -252,60 +251,6 @@ docker exec -i oracle23ai-db \
 
 O resultado deve ser `N\00FAmero C\00F3digo Situa\00E7\00E3o`, nunca uma
 sequência com `\FFFD`.
-
-### Reparar somente os comentários do DDL local
-
-Em um banco já provisionado, não execute novamente o arquivo
-`local/ddl/001_ods_baixaporof_cadastro.sql`, pois ele também contém criação de
-tabela, índices e view. Depois de recriar e validar o container, execute:
-
-```bash
-make repair-baixaporof-comments
-```
-
-O target extrai a partir do primeiro
-`COMMENT ON TABLE ADMODS001.ODS_BAIXAPOROF_CADASTRO IS`, valida uma allowlist
-restrita aos comentários de `ODS_BAIXAPOROF_CADASTRO` e
-`ODS_VW_BAIXAPOROFICIO`, adiciona `WHENEVER SQLERROR EXIT SQL.SQLCODE`, muda a
-sessão para `FREEPDB1` e chama o SQL*Plus com `NLS_LANG=.AL32UTF8`. Se o marco
-não existir ou aparecer outro comando SQL/SQL*Plus, nada é executado. O target
-não recria objetos e não modifica dados, colunas, índices ou constraints.
-
-Valide os comentários corrompidos:
-
-```sql
-ALTER SESSION SET CONTAINER=FREEPDB1;
-
-SELECT COUNT(*) AS comentarios_corrompidos
-FROM all_col_comments
-WHERE owner = 'ADMODS001'
-  AND table_name IN (
-      'ODS_BAIXAPOROF_CADASTRO',
-      'ODS_VW_BAIXAPOROFICIO'
-  )
-  AND INSTR(comments, UNISTR('\FFFD')) > 0;
-```
-
-O resultado esperado é `0`. Faça também a verificação pontual:
-
-```sql
-SELECT
-    table_name,
-    column_name,
-    comments,
-    ASCIISTR(comments) AS representacao_unicode
-FROM all_col_comments
-WHERE owner = 'ADMODS001'
-  AND table_name = 'ODS_BAIXAPOROF_CADASTRO'
-  AND column_name = 'NUM_PESSOA_CNPJ';
-```
-
-Resultados esperados:
-
-```text
-Número da Pessoa no CNPJ (Código Interno SEFAZ)
-N\00FAmero da Pessoa no CNPJ (C\00F3digo Interno SEFAZ)
-```
 
 ## Scripts de criação do esquema
 
