@@ -85,7 +85,12 @@ status:
 	  docker inspect --format='health={{if .State.Health}}{{.State.Health.Status}}{{else}}não definido{{end}} status={{.State.Status}}' "$$container_id"
 
 version:
-	@$(COMPOSE) exec -T oracle bash -lc 'printf "%s\n" "SET HEADING OFF FEEDBACK OFF PAGESIZE 0" "SELECT banner_full FROM v\$$version WHERE banner_full LIKE '\''Oracle Database%\'' FETCH FIRST 1 ROW ONLY;" "EXIT" | sqlplus -s / as sysdba'
+	@printf '%s\n' \
+	  'SET HEADING OFF' \
+	  'SET FEEDBACK OFF' \
+	  'SET PAGESIZE 0' \
+	  'SELECT banner_full FROM v$$version;' \
+	  'EXIT;' | $(COMPOSE) exec -T oracle sqlplus -s "/ as sysdba"
 
 stop:
 	@$(COMPOSE) stop
