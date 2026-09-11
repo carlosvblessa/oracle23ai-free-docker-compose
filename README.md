@@ -194,6 +194,21 @@ make sql-owner
 make sql-app
 ```
 
+Para executar um arquivo SQL não interativamente como o usuário da aplicação,
+sem montar o arquivo no container, use `SQL_FILE`:
+
+```bash
+mkdir -p local/sql
+make sql-app-file SQL_FILE=local/sql/consulta.sql
+```
+
+O executor lê o arquivo no host e o envia ao SQL*Plus por `stdin` com TTY
+desabilitado. Ele interrompe em erros Oracle ou do sistema, também trata erros
+`SP2-*` como falha e habilita `SQLBLANKLINES ON`. O diretório `local/` já é
+ignorado pelo Git e é apropriado para consultas operacionais que não devem ser
+versionadas. Scripts chamados com `@outro-arquivo.sql` precisam estar acessíveis
+dentro do container; para consultas independentes, prefira um único arquivo.
+
 ### Codificação UTF-8 no SQL*Plus
 
 `ORACLE_CHARACTERSET` define o charset usado quando o banco é criado. Ele não

@@ -7,7 +7,7 @@ COMPOSE = ORACLE_PWD="$$(tr -d '\r\n' < secrets/oracle_password.txt)" docker com
 
 .PHONY: help init secrets access login config pull up logs ps status version provision \
         adopt-provisioned verify stop down destroy sql-sys sql-system sql-admin sql-owner \
-        sql-app apply-schema refresh-grants backup
+        sql-app sql-app-file apply-schema refresh-grants backup
 
 help:
 	@printf '%s\n' \
@@ -28,6 +28,7 @@ help:
 	  'make sql-admin       Abre como administrador local' \
 	  'make sql-owner       Abre como proprietário do esquema' \
 	  'make sql-app         Abre como usuário da aplicação' \
+	  'make sql-app-file    Executa SQL_FILE como usuário da aplicação' \
 	  'make apply-schema    Executa os arquivos db/schema/*.sql' \
 	  'make refresh-grants  Reaplica grants nos objetos do esquema' \
 	  'make backup          Exporta o esquema com Data Pump' \
@@ -116,6 +117,9 @@ sql-owner: access
 
 sql-app: access
 	@$(COMPOSE) exec oracle bash -lc 'sqlplus -L "$${DB_RUNTIME_USER}/\"$$(cat /run/secrets/db_runtime_password)\"@//localhost:1521/FREEPDB1"'
+
+sql-app-file:
+	@./scripts/run-sql-file.sh "$(SQL_FILE)"
 
 apply-schema: access
 	@$(COMPOSE) exec -T oracle bash /project/setup/002-run-schema.sh
